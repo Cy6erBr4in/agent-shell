@@ -9043,5 +9043,166 @@ Its retired default is left alone, as is an unbound variable."
       (should (catch 'started (agent-shell--start :config nil))))
     (should (catch 'started (agent-shell--start :config nil)))))
 
+(defun agent-shell-tests--make-started-shell (name directory)
+  "Return a buffer NAME standing in for a shell started in DIRECTORY.
+
+Its state records it as its own `:buffer', as `agent-shell--start'
+leaves it."
+  (let ((buffer (generate-new-buffer name)))
+    (with-current-buffer buffer
+      (setq default-directory directory)
+      (setq-local agent-shell--state
+                  (agent-shell--make-state :buffer buffer)))
+    buffer))
+
+(ert-deftest agent-shell-cwd-in-started-shell-test ()
+  "Test that a started shell reports its own directory as `agent-shell-cwd'.
+
+Only a shell `agent-shell--start' has finished setting up skips
+`agent-shell-cwd-function'."
+  (let* ((cwd-calls 0)
+         (agent-shell-cwd-function (lambda ()
+                                     (setq cwd-calls (1+ cwd-calls))
+                                     "/path/to/elsewhere/"))
+         (shell (agent-shell-tests--make-started-shell
+                 "started-shell" "/path/to/project/")))
+    (unwind-protect
+        (progn
+          (with-current-buffer shell
+            (should (equal (agent-shell-cwd) "/path/to/project/")))
+          (should (equal cwd-calls 0))
+          ;; A buffer that isn't a shell, like the file buffer
+          ;; `agent-shell' was invoked from, asks `agent-shell-cwd-function'.
+          (with-temp-buffer
+            (should (equal (agent-shell-cwd) "/path/to/elsewhere/")))
+          (should (equal cwd-calls 1)))
+      (kill-buffer shell))))
+
+(ert-deftest agent-shell-project-buffers-uses-given-cwd-test ()
+  "Test that `agent-shell-project-buffers' matches buffers against CWD."
+  (let ((in-project (generate-new-buffer "in-project-shell"))
+        (other-project (generate-new-buffer "other-project-shell")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'agent-shell-buffers)
+                   (lambda () (list in-project other-project)))
+                  ((symbol-function 'agent-shell-cwd)
+                   (lambda ()
+                     (if (eq (current-buffer) in-project)
+                         "/path/to/project/"
+                       "/path/to/elsewhere/"))))
+          ;; Given a CWD argument, buffers are matched against it rather than
+          ;; against the current buffer's own CWD.
+          (should (equal (agent-shell-project-buffers "/path/to/project/")
+                         (list in-project)))
+          (should (equal (agent-shell-project-buffers "/path/to/nowhere/")
+                         nil))
+          ;; Without a CWD argument, it is computed in the current buffer.
+          (with-current-buffer in-project
+            (should (equal (agent-shell-project-buffers)
+                           (list in-project)))))
+      (kill-buffer in-project)
+      (kill-buffer other-project))))
+
+(ert-deftest agent-shell--shell-buffer-returns-project-shell-test ()
+  "Test that finding an open project shell resolves the CWD only once.
+
+`agent-shell-cwd-function' may be expensive or interactive (prompting
+for a directory, say), so it runs for the current buffer alone, not
+again for every open shell `agent-shell-project-buffers' looks at."
+  (let* ((cwd-calls 0)
+         (agent-shell-cwd-function (lambda ()
+                                     (setq cwd-calls (1+ cwd-calls))
+                                     "/path/to/project/"))
+         (shells (list (agent-shell-tests--make-started-shell
+                        "other-shell" "/path/to/elsewhere/")
+                       (agent-shell-tests--make-started-shell
+                        "project-shell" "/path/to/project/")
+                       (agent-shell-tests--make-started-shell
+                        "another-shell" "/path/to/another/")))
+         (started nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'agent-shell-buffers)
+                   (lambda () shells))
+                  ((symbol-function 'agent-shell--start)
+                   (lambda (&rest _)
+                     (setq started t)
+                     (generate-new-buffer "fake-shell"))))
+          (with-temp-buffer
+            (should (eq (agent-shell--shell-buffer) (nth 1 shells)))
+            (should (equal cwd-calls 1))
+            (should-not started)))
+      (mapc #'kill-buffer shells))))
+
+(ert-deftest agent-shell--shell-buffer-computes-cwd-once-test ()
+  "Test that creating a shell resolves `agent-shell-cwd-function' only once.
+
+With no open shell in the project, `agent-shell--shell-buffer' hands the
+CWD it looked up shells by to `agent-shell--start' rather than have it
+recomputed there."
+  (let* ((cwd-calls 0)
+         (agent-shell-session-strategy 'prompt)
+         (agent-shell-cwd-function (lambda ()
+                                     (setq cwd-calls (1+ cwd-calls))
+                                     "/path/to/project/"))
+         (shells (list (agent-shell-tests--make-started-shell
+                        "other-shell" "/path/to/elsewhere/")
+                       (agent-shell-tests--make-started-shell
+                        "another-shell" "/path/to/another/")))
+         (start-args nil)
+         (fake-shell nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'agent-shell-buffers)
+                   (lambda () shells))
+                  ((symbol-function 'agent-shell--auto-preferred-config)
+                   (lambda () (agent-shell-make-agent-config :buffer-name "Fake")))
+                  ((symbol-function 'agent-shell--start)
+                   (lambda (&rest args)
+                     (setq start-args args)
+                     (setq fake-shell (generate-new-buffer "fake-shell")))))
+          (with-temp-buffer
+            (should (eq (agent-shell--shell-buffer) fake-shell))
+            (should (equal cwd-calls 1))
+            (should (equal (plist-get start-args :cwd) "/path/to/project/"))))
+      (mapc #'kill-buffer shells)
+      (when (buffer-live-p fake-shell)
+        (kill-buffer fake-shell)))))
+
+(ert-deftest agent-shell--start-cwd-test ()
+  "Test that `agent-shell--start' starts the shell in CWD when given.
+
+Only when CWD is nil does it fall back to computing `agent-shell-cwd'.
+A directory that does not exist is an error, rather than leaving
+`shell-maker-start-v2' to start the shell somewhere else."
+  (let* ((passed-dir (file-name-as-directory (make-temp-file "passed-" t)))
+         (computed-dir (file-name-as-directory (make-temp-file "computed-" t)))
+         (cwd-calls 0)
+         (agent-shell-cwd-function (lambda ()
+                                     (setq cwd-calls (1+ cwd-calls))
+                                     computed-dir))
+         (config (agent-shell-make-agent-config
+                  :buffer-name "Fake"
+                  :shell-prompt "Fake> "
+                  :shell-prompt-regexp "Fake> ")))
+    (unwind-protect
+        ;; Capture the `default-directory' the shell would start in,
+        ;; bailing out before any of the shell machinery runs.
+        (cl-letf (((symbol-function 'shell-maker-start-v2)
+                   (lambda (&rest _)
+                     (throw 'agent-shell-tests--started default-directory))))
+          (should (equal (catch 'agent-shell-tests--started
+                           (agent-shell--start :config config :cwd passed-dir))
+                         passed-dir))
+          (should (equal cwd-calls 0))
+          (should (equal (catch 'agent-shell-tests--started
+                           (agent-shell--start :config config))
+                         computed-dir))
+          (should (equal cwd-calls 1))
+          (delete-directory passed-dir)
+          (should-error (catch 'agent-shell-tests--started
+                          (agent-shell--start :config config :cwd passed-dir))))
+      (dolist (dir (list passed-dir computed-dir))
+        (when (file-directory-p dir)
+          (delete-directory dir))))))
+
 (provide 'agent-shell-tests)
 ;;; agent-shell-tests.el ends here

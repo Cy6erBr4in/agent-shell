@@ -26,9 +26,11 @@
 
 ;;; Code:
 
+(require 'map)
 (require 'project)
 (require 'subr-x)
 
+(defvar agent-shell--state)
 (defvar projectile-mode)
 
 (declare-function projectile-project-p "projectile")
@@ -67,10 +69,15 @@ When nil (the default), `agent-shell-cwd' uses project root detection."
 (defun agent-shell-cwd ()
   "Return the CWD for this shell.
 
-If `agent-shell-cwd-function' is set, use it.
+In a shell `agent-shell--start' has set up, return its
+`default-directory', which was resolved when the shell started.
+Otherwise, if `agent-shell-cwd-function' is set, use it.
 Otherwise, if in a project, use project root."
   (expand-file-name
-   (or (when agent-shell-cwd-function
+   (or (when (and (bound-and-true-p agent-shell--state)
+                  (eq (map-elt agent-shell--state :buffer) (current-buffer)))
+         default-directory)
+       (when agent-shell-cwd-function
          (funcall agent-shell-cwd-function))
        (when (and (boundp 'projectile-mode)
                   projectile-mode
