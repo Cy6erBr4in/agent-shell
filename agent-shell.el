@@ -5080,7 +5080,8 @@ own banner, passing along their shell-maker config."
      (agent-shell-markdown-convert
       "- `2026-09-22` [agent-shell 0.78 updates](https://xenodium.com/agent-shell-0-78-updates)
 - `2026-08-15` [agent-shell 0.73 updates](https://xenodium.com/agent-shell-0-73-updates)
-- `2026-07-22` [agent-shell 0.63 updates](https://xenodium.com/agent-shell-0-63-updates)"))
+- `2026-07-22` [agent-shell 0.63 updates](https://xenodium.com/agent-shell-0-63-updates)"
+      :tracking-file (locate-user-emacs-file "agent-shell/markdown-links.eld")))
    "\n\n"
    "       FUNDING\n\n"
    "       Is agent-shell fundamental to your workflow?\n"
