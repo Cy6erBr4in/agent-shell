@@ -4886,6 +4886,9 @@ Searches with `case-fold-search' nil, as
             (should (equal (buffer-string) "docs and other"))
             (let ((display (get-text-property (length "docs") 'display)))
               (should (equal (cddr display) "s (new)"))
+              ;; The label does not inherit the link's underline.
+              (should (equal (get-text-property 1 'face (cddr display))
+                             '((:underline nil) agent-shell-markdown-inline-code)))
               (should (eval (cadr display) t))
               (funcall (lookup-key (get-text-property (point-min) 'keymap) (kbd "RET")))
               (should (equal (buffer-string) "docs and other"))

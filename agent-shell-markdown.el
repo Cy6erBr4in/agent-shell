@@ -1209,8 +1209,11 @@ and a keymap that opens the URL.  With TRACKING-FILE,
                `(when (not (agent-shell-markdown--link-opened-p
                             :url ,url :tracking-file ,tracking-file))
                   . ,(concat (buffer-substring (1- (point)) (point))
+                             ;; A display string merges in the face of the text
+                             ;; it replaces, so drop the link's underline.
                              (propertize (concat " " tracking-label)
-                                         'face 'agent-shell-markdown-inline-code)))))
+                                         'face '((:underline nil)
+                                                 agent-shell-markdown-inline-code))))))
             (when source
               (put-text-property markup-start (point)
                                  'agent-shell-markdown-source source)))))))))
