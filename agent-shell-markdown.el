@@ -59,6 +59,30 @@
 ;; Open / streaming fenced blocks (no closing fence yet) are
 ;; left alone so their contents stay protected as the buffer
 ;; grows.
+;;
+;; Why not `markdown-ts-mode'?
+;;
+;; Emacs 31 ships `markdown-ts-mode', which is built for editing:
+;; markdown source stays intact and markup is only hidden.  This
+;; package is optimized for rendering streamed output: markup is removed
+;; and rendered text is frozen as new output arrives.  Its rendering
+;; is opinionated and tuned for agent-shell, so it may not suit
+;; general markdown viewing.  As of Emacs 31.0.90, the difference
+;; shows up as:
+;;
+;;   streaming   It renders via font-lock, which may re-run over any
+;;               region.  Freezing rendered text behind a watermark
+;;               would have to be built on top of it.
+;;   copying     Markup is hidden with `invisible' / `display', so
+;;               copied text keeps `**', `- ', `![alt](url)', etc.
+;;   major mode  Shell buffers already have a major mode, with
+;;               markdown confined to regions between prompts and
+;;               tool calls.
+;;   tables      Pipe tables are aligned as source rather than drawn,
+;;               and parse inconsistently (ragged rows, empty cells).
+;;   versions    Needs Emacs 31.1 plus the `markdown' and
+;;               `markdown-inline' grammars.  agent-shell supports
+;;               Emacs 29.1.
 
 ;;; Code:
 
