@@ -5200,8 +5200,6 @@ variable (see makunbound)"))
       (add-hook 'agent-shell-ui-post-expand-fragment-at-point-hook
                 #'agent-shell--render-markdown nil t)
       (agent-shell-completion--setup)
-      (when agent-shell-file-completion-enabled
-        (agent-shell-completion-mode +1))
       (agent-shell--enable-dnd)
       (yank-media-handler "image/.*" #'agent-shell--yank-media-image)
       (agent-shell--setup-modeline)

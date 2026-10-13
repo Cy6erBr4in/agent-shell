@@ -1134,6 +1134,7 @@ always go to Evil modes if you need to with ~C-z~).
 | agent-shell-clipboard-image-handlers          | Handlers for saving clipboard images to a file.                                 |
 | agent-shell-codebuddy-acp-command             | Command and parameters for the CodeBuddy agent client.                          |
 | agent-shell-codebuddy-environment             | Environment variables for the CodeBuddy agent client.                           |
+| agent-shell-command-completion-enabled        | Non-nil pops agent command completion as / is typed.                            |
 | agent-shell-command-prefix                    | Prefix to apply when executing agent commands and shell commands.               |
 | agent-shell-completion-mode-hook              | Hook run after entering or leaving ‘agent-shell-completion-mode’.               |
 | agent-shell-confirm-interrupt                 | Whether to prompt for confirmation before interrupting.                         |
@@ -1152,7 +1153,7 @@ always go to Evil modes if you need to with ~C-z~).
 | agent-shell-droid-default-session-mode-id     | Default Droid AI session mode ID.                                               |
 | agent-shell-droid-environment                 | Environment variables for the Factory Droid ACP client.                         |
 | agent-shell-embed-file-size-limit             | Maximum file size in bytes for embedding with ContentBlock::Resource.           |
-| agent-shell-file-completion-enabled           | Non-nil enables ‘agent-shell-completion-mode’ when starting shells.             |
+| agent-shell-file-completion-enabled           | Non-nil pops project file completion as @ is typed.                             |
 | agent-shell-file-display-action               | Display action for files opened from a link, image, or ‘@file’ mention.         |
 | agent-shell-github-acp-command                | Command and parameters for the GitHub Copilot agent client.                     |
 | agent-shell-github-default-model-id           | Default GitHub Copilot model ID.                                                |
