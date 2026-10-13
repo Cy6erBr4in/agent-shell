@@ -5084,8 +5084,7 @@ own banner, passing along their shell-maker config."
       :tracking-file (locate-user-emacs-file "agent-shell/markdown-links.eld")))
    "\n\n"
    "       FUNDING\n\n"
-   "       Is agent-shell fundamental to your workflow?\n"
-   "       It can only survive if its users help fund it.\n\n"
+   "       Tokens keep your agents running. Sponsors keep agent-shell running.\n\n"
    "       Consider ✨"
    (shell-maker-make-button-text "sponsoring"
                                  (lambda ()
