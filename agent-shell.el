@@ -5092,10 +5092,15 @@ own banner, passing along their shell-maker config."
                                    (message "Thank you!")))
    "✨ (or ask your employer to).\n\n"))
 
-(cl-defun agent-shell--start (&key config no-focus new-session session-strategy session-id fork-session-id outgoing-request-decorator)
+(cl-defun agent-shell--start (&key config no-focus new-session session-strategy session-id fork-session-id outgoing-request-decorator cwd)
   "Programmatically start shell with CONFIG.
 
 See `agent-shell-make-agent-config' for config format.
+
+CWD is the shell's working directory, defaulting to `agent-shell-cwd'.
+Callers that have already computed it should pass it, since
+`agent-shell-cwd-function' may be expensive or interactive.  Signal an
+error if it is not an existing directory.
 
 Set NO-FOCUS to start in background.
 Set NEW-SESSION to start a separate new session.
@@ -5132,7 +5137,12 @@ variable (see makunbound)"))
                               :prompt (map-elt config :shell-prompt)
                               :prompt-regexp (map-elt config :shell-prompt-regexp)))
          (agent-shell--shell-maker-config shell-maker-config)
-         (default-directory (agent-shell-cwd))
+         (default-directory (let ((cwd (or cwd (agent-shell-cwd))))
+                              ;; `shell-maker-start-v2' would otherwise quietly
+                              ;; fall back to "~/" and use that value forever.
+                              (unless (file-directory-p cwd)
+                                (error "Not an existing directory: %s" cwd))
+                              cwd))
          (shell-buffer
           ;; Suppress mode hook during shell-maker-start since
           ;; agent-shell state isn't ready yet.
@@ -9235,9 +9245,11 @@ Continue?" (agent-shell--prompt-queue-summary)))
 
 ;;; Projects
 
-(defun agent-shell-project-buffers ()
-  "Return all shell buffers in the same project as current buffer."
-  (let ((project-root (agent-shell-cwd)))
+(defun agent-shell-project-buffers (&optional cwd)
+  "Return all shell buffers in the same project as current buffer.
+
+CWD is the current buffer's `agent-shell-cwd', which is computed if nil."
+  (let ((project-root (or cwd (agent-shell-cwd))))
     (seq-filter (lambda (buffer)
                   (equal project-root
                          (with-current-buffer buffer
@@ -9259,11 +9271,16 @@ When NO-CREATE is non-nil, return existing shell or nil/error if none exists.
 When NO-ERROR is non-nil, return nil instead of raising an error.
 
 Returns a buffer object or nil."
-  (let ((shell-buffer (or (agent-shell-viewport--shell-buffer
-                           (or viewport-buffer (current-buffer)))
-                          (if (derived-mode-p 'agent-shell-mode)
-                              (current-buffer)
-                            (seq-first (agent-shell-project-buffers))))))
+  (let* (;; Computed only when looking for a shell in the current project,
+         ;; and reused when creating one (which only happens after that), since
+         ;; `agent-shell-cwd-function' may be expensive or interactive.
+         (cwd nil)
+         (shell-buffer (or (agent-shell-viewport--shell-buffer
+                            (or viewport-buffer (current-buffer)))
+                           (if (derived-mode-p 'agent-shell-mode)
+                               (current-buffer)
+                             (seq-first (agent-shell-project-buffers
+                                         (setq cwd (agent-shell-cwd))))))))
     (if shell-buffer
         shell-buffer
       (if no-create
@@ -9294,14 +9311,16 @@ Returns a buffer object or nil."
                                                   :prompt "Start new agent: ")
                                                  (error "No agent config found"))
                                      :no-focus t
-                                     :new-session t))))
+                                     :new-session t
+                                     :cwd cwd))))
           (agent-shell--start :config (or (agent-shell--auto-preferred-config)
                                           (agent-shell-select-config
                                            :prompt "Start new agent: ")
                                           (error "No agent config found"))
                               :no-focus t
                               :new-session t
-                              :session-strategy agent-shell-session-strategy))))))
+                              :session-strategy agent-shell-session-strategy
+                              :cwd cwd))))))
 
 (defun agent-shell-goto-last-interaction ()
   "Move point to the last interaction in the shell buffer."
