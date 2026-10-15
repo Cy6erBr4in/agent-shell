@@ -69,12 +69,11 @@ When nil (the default), `agent-shell-cwd' uses project root detection."
   :group 'agent-shell)
 
 (defun agent-shell-cwd ()
-  "Return the CWD for this shell.
+  "Return the working directory for the current shell, or for a new one.
 
-In a shell `agent-shell--start' has set up, return its
-`default-directory', which was resolved when the shell started.
-Otherwise, if `agent-shell-cwd-function' is set, use it.
-Otherwise, if in a project, use project root."
+Within a shell, return the directory it started in.  Elsewhere, return
+the directory a new shell would start in: `agent-shell-cwd-function'
+if set, else the project root, else `default-directory'."
   (expand-file-name
    (or (when (and (bound-and-true-p agent-shell--state)
                   (eq (map-elt agent-shell--state :buffer) (current-buffer)))
