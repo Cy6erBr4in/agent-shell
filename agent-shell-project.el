@@ -61,6 +61,8 @@
 
 The function receives no arguments and should return a directory path.
 
+Shells call it once on start and reuse that directory thereafter.
+
 When nil (the default), `agent-shell-cwd' uses project root detection."
   :type '(choice (const :tag "Default (project root)" nil)
                  (function :tag "Custom function"))
